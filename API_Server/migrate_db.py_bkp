@@ -1,0 +1,167 @@
+"""
+Database Migration Script for AgriAssist Backend
+This script helps migrate the database to include the new Field and Crop models.
+Run this after updating your models.py file.
+"""
+
+from main import app
+from app.extensions import db
+from app.models import User, Field, Crop, PlantAnalysis, CropRecommendation, WeatherData
+
+def get_existing_tables():
+    """Get list of existing tables in the database"""
+    with app.app_context():
+        try:
+            inspector = db.inspect(db.engine)
+            return inspector.get_table_names()
+        except Exception as e:
+            print(f"❌ Error getting existing tables: {str(e)}")
+            return []
+
+def get_model_tables():
+    """Get list of tables defined in models"""
+    model_tables = []
+    for table_name in db.metadata.tables.keys():
+        model_tables.append(table_name)
+    return model_tables
+
+def create_missing_tables():
+    """Create only the missing tables that are defined in models but not in database"""
+    with app.app_context():
+        try:
+            existing_tables = get_existing_tables()
+            model_tables = get_model_tables()
+            
+            missing_tables = [table for table in model_tables if table not in existing_tables]
+            
+            if not missing_tables:
+                print("✅ All model tables already exist in the database!")
+                print(f"📊 Existing tables: {', '.join(existing_tables)}")
+                return
+            
+            print(f"🔍 Found {len(missing_tables)} missing tables: {', '.join(missing_tables)}")
+            
+            # Create only missing tables
+            for table_name in missing_tables:
+                if table_name in db.metadata.tables:
+                    table = db.metadata.tables[table_name]
+                    table.create(db.engine)
+                    print(f"✅ Created table: {table_name}")
+            
+            print(f"\n🎉 Successfully created {len(missing_tables)} missing tables!")
+            
+            # Show final table status
+            final_tables = get_existing_tables()
+            print(f"📊 Total tables in database: {len(final_tables)}")
+            for table in final_tables:
+                print(f"  - {table}")
+                
+            print("\n🔗 Relationships configured:")
+            print("  - User → Fields (One-to-Many)")
+            print("  - User → PlantAnalysis (One-to-Many)")
+            print("  - User → CropRecommendation (One-to-Many)")
+            print("  - Field → Crops (One-to-Many)")
+            
+        except Exception as e:
+            print(f"❌ Error creating missing tables: {str(e)}")
+
+def create_tables():
+    """Create all database tables"""
+    with app.app_context():
+        try:
+            # Create all tables
+            db.create_all()
+            print("✅ Database tables created successfully!")
+            
+            # Print table information
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            print(f"\n📊 Created {len(tables)} tables:")
+            for table in tables:
+                print(f"  - {table}")
+                
+            print("\n🔗 Relationships configured:")
+            print("  - User → Fields (One-to-Many)")
+            print("  - User → PlantAnalysis (One-to-Many)")
+            print("  - User → CropRecommendation (One-to-Many)")
+            print("  - Field → Crops (One-to-Many)")
+            
+        except Exception as e:
+            print(f"❌ Error creating tables: {str(e)}")
+
+def drop_tables():
+    """Drop all database tables (use with caution!)"""
+    with app.app_context():
+        try:
+            db.drop_all()
+            print("⚠️ All database tables dropped!")
+        except Exception as e:
+            print(f"❌ Error dropping tables: {str(e)}")
+
+def reset_database():
+    """Reset database - drop and recreate all tables"""
+    print("⚠️ WARNING: This will delete all existing data!")
+    confirm = input("Type 'yes' to continue: ")
+    
+    if confirm.lower() == 'yes':
+        drop_tables()
+        create_tables()
+        print("🔄 Database reset completed!")
+    else:
+        print("❌ Database reset cancelled")
+
+def check_database_status():
+    """Check current database status"""
+    with app.app_context():
+        try:
+            existing_tables = get_existing_tables()
+            model_tables = get_model_tables()
+            
+            print("📋 Database Status Report:")
+            print(f"  Existing tables: {len(existing_tables)}")
+            print(f"  Model tables: {len(model_tables)}")
+            
+            if existing_tables:
+                print(f"\n✅ Existing tables:")
+                for table in existing_tables:
+                    print(f"    - {table}")
+            
+            missing_tables = [table for table in model_tables if table not in existing_tables]
+            if missing_tables:
+                print(f"\n⚠️  Missing tables:")
+                for table in missing_tables:
+                    print(f"    - {table}")
+            else:
+                print(f"\n✅ All model tables exist in database!")
+            
+        except Exception as e:
+            print(f"❌ Error checking database status: {str(e)}")
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+        
+        if command == "create":
+            create_tables()
+        elif command == "drop":
+            drop_tables()
+        elif command == "reset":
+            reset_database()
+        elif command == "missing":
+            create_missing_tables()
+        elif command == "status":
+            check_database_status()
+        else:
+            print("Usage: python migrate_db.py [create|drop|reset|missing|status]")
+            print("  create  - Create all tables")
+            print("  drop    - Drop all tables")
+            print("  reset   - Drop and recreate all tables")
+            print("  missing - Create only missing tables")
+            print("  status  - Check database status")
+    else:
+        # Default action - create missing tables
+        print("🚀 Running default migration: Creating missing tables...")
+        create_missing_tables()
